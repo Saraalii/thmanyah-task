@@ -1,3 +1,14 @@
+#thmanyah‑task
+
+
+This repo spins up a real‑time data pipeline that captures raw user‑engagement events from Kafka topic engagements, enriches them with content metadata from PostgreSQL through a Flink SQL job, calculates engagement_seconds and engagement_pct, and pushes the results to Kafka topic processed_engagements. The full stack (Kafka, Flink, Postgres) ships in Docker containers, so you can launch everything with a single docker compose up and start querying within seconds.
+
+1 · Architecture at a glance
+* PostgreSQL > Stores the content dimension table (content) > postgres:15
+* Kafka > Transports raw & processed events (engagements،processed_engagements)  > confluentinc/cp-kafka:7.5.3
+* Flink > Runs the streaming job (Flink SQL) > flink:1.17.1
+* (Optional) Redis / BigQuery > Extra sinks for real‑time dashboards or heavy analytics
+
 ## How to Run the Project
 
 Below is an end‑to‑end guide you can copy‑paste in a terminal (macOS / Linux / WSL).  
@@ -11,11 +22,9 @@ Each block is independent—run it one‑by‑one.
   ```
 
 ### 1  Clone & Start the stack
-```bash
-git clone <repo‑url>
-cd thmanyah-task-fixed
-docker compose up -d         # starts ZK, Kafka, Postgres, Flink
-```
+Docker 20+ / Docker Desktop
+
+At least 4 GB RAM free for the containers
 
 ### 2  Add Flink connectors (one time)
 ```bash
