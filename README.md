@@ -37,8 +37,6 @@ Kafka → Flink SQL (joins + metrics) → Kafka
 | Main `INSERT` job submitted            | **🟡 Failed / Iterating** | Type‑casting edge‑case (UUID➞STRING) caused *FAILED* state  |
 | Extra sinks (Redis / BigQuery)         | ⏩                         | Out‑of‑scope for current sprint                             |
 
-> **Why we paused**: The team pivoted to recording a *self‑intro video* for the hiring process. Job debugging will resume after feedback on the current milestone.
-
 ---
 
 ## 3  Quick‑start (copy‑paste friendly)
@@ -157,8 +155,6 @@ ON e.content_id = c.id;
 
 ### 3.5  Emit / Verify a test event
 
-Same as before (steps 5‑6 in the Arabic notes).
-
 ---
 
 ## 4  Troubleshooting Cheatsheet
@@ -176,7 +172,6 @@ Same as before (steps 5‑6 in the Arabic notes).
 1. Fix UUID type‑mismatch & re‑submit job
 2. Add Redis sink for 5‑minute rolling top‑N view
 3. Wire BigQuery batch backfill path
-4. Set up CI pipeline to auto‑publish connector JARs
 
 ---
 
