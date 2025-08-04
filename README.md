@@ -12,7 +12,13 @@ Kafka → Flink SQL (joins + metrics) → Kafka
            ↑                       ↓
      PostgreSQL (content dim)   (optional) Redis / BigQuery
 ```
+| Service      | URL / Port         | Notes                                |
+|--------------|--------------------|--------------------------------------|
+| PostgreSQL   | `localhost:5432`   | User: `thmanyah`, Password: `thmanyah123` |
+| Kafka        | `localhost:9092`   | Kafka broker                         |
+| Flink UI     | http://localhost:8081 | Flink SQL Client Dashboard         |
 
+---
 ## نظرة عامة على البنية
 
 | الطبقة                  | الغرض                            | الصورة/الإصدار                  |
