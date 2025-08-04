@@ -10,6 +10,24 @@
 | ‎duration_ms / 1000‎ → عدد الثواني الفعليّة للتفاعل   | engagement_seconds   | 
 | ‎engagement_seconds / length_seconds * 100‎ (بدقّة منزلتين)        | engagement_pct	           |
 
+وتُكتب النتيجة في موضوع Kafka آخر اسمه processed_engagements.
+جميع الخدمات (Kafka + Zookeeper + Postgres + Flink) تُشغَّل في Docker Compose.
+
+## مخطّط المكوّنات
+yaml
+
+
+┌────────────┐      raw events       ┌───────────┐   enriched stream   ┌────────────────┐
+│  Producer  │  ───────────────────> │  Kafka     │ ──────────────────> │  Flink Job     │
+│  (Python)  │   topic: engagements  │  Broker    │  topic: processed_ │  (SQL pipeline)│
+└────────────┘                       └───────────┘     engagements     └──┬──────────────┘
+                                        ▲                                │lookup
+                                        │                                │
+                               ┌────────┴──────┐                         │
+                               │ PostgreSQL    │  content dimension     │
+                               │  table:       │<───────────────────────┘
+                               │   content     │
+                               └───────────────┘
 
 
 تم تنفيذ المشروع بدءًا من إعداد PostgreSQL ومرورًا بـ Flink وPython ,Kafka حتى تم بناء الجدول النهائي عبر Flink SQL.
