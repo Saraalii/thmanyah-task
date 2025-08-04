@@ -22,9 +22,11 @@ Each block is independent—run it one‑by‑one.
   ```
 
 ### 1  Clone & Start the stack
-Docker 20+ / Docker Desktop
-
-At least 4 GB RAM free for the containers
+```bash
+git clone <repo‑url>
+cd thmanyah-task-fixed
+docker compose up -d         # starts ZK, Kafka, Postgres, Flink
+```
 
 ### 2  Add Flink connectors (one time)
 ```bash
