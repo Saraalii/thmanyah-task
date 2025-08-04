@@ -5,11 +5,11 @@
 الفكرة باختصار
 نُنشئ خطّ معالجة بيانات لحظي (Real-Time Pipeline) يلتقط أحداث تفاعل المستخدمين من Kafka، ويُثريها بمعلومات المحتوى من PostgreSQL عبر Flink SQL، ثم يحسب :
 
-| Service      | URL / Port         | 
+| الوصف      | الحقل         | 
 |--------------|--------------------|
-| PostgreSQL   | `localhost:5432`   | 
-| Kafka        | `localhost:9092`             |
-| Flink UI     | http://localhost:8081        |
+| ‎duration_ms / 1000‎ → عدد الثواني الفعليّة للتفاعل   | engagement_seconds   | 
+| ‎engagement_seconds / length_seconds * 100‎ (بدقّة منزلتين)        | engagement_pct	           |
+
 
 
 تم تنفيذ المشروع بدءًا من إعداد PostgreSQL ومرورًا بـ Flink وPython ,Kafka حتى تم بناء الجدول النهائي عبر Flink SQL.
