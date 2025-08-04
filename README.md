@@ -186,7 +186,7 @@ ON e.content_id = c.id;
 
 ```
 
-7. **تجربة حدث 
+## 7. تجربة حدث 
 ```
 
 echo '{"id":"1",
@@ -200,6 +200,8 @@ echo '{"id":"1",
 docker exec -i thmanyah-task-kafka-1 \
 kafka-console-producer --bootstrap-server kafka:9092 --topic engagements
 ```
+
+## 8. التحقق
 ```
 -- التحقق من المخرجات
 
