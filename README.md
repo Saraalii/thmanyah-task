@@ -1,34 +1,67 @@
 # thmanyah‑task
 
+A self‑contained **real‑time data pipeline** that turns raw user‑engagement events into enriched analytics streams, all in Docker.
 
-This repo spins up a real‑time data pipeline that captures raw user‑engagement events from Kafka topic engagements, enriches them with content metadata from PostgreSQL through a Flink SQL job, calculates engagement_seconds and engagement_pct, and pushes the results to Kafka topic processed_engagements. The full stack (Kafka, Flink, Postgres) ships in Docker containers, so you can launch everything with a single docker compose up and start querying within seconds.
-
-1 · Architecture at a glance
-* PostgreSQL > Stores the content dimension table (content) > postgres:15
-* Kafka > Transports raw & processed events (engagements،processed_engagements)  > confluentinc/cp-kafka:7.5.3
-* Flink > Runs the streaming job (Flink SQL) > flink:1.17.1
-* (Optional) Redis / BigQuery > Extra sinks for real‑time dashboards or heavy analytics
-
-## How to Run the Project
-
-Below is an end‑to‑end guide you can copy‑paste in a terminal (macOS / Linux / WSL).  
-Each block is independent—run it one‑by‑one.
-
-### 0  Prerequisites
-* Docker & Docker Compose installed
-* Python 3.8+ with:
-  ```bash
-  pip install psycopg2-binary kafka-python
-  ```
-
-### 1  Clone & Start the stack
-```bash
-git clone <repo‑url>
-cd thmanyah-task
-docker compose up -d        
+```
+Kafka → Flink SQL (joins + metrics) → Kafka
+           ↑                       ↓
+     PostgreSQL (content dim)   (optional) Redis / BigQuery
 ```
 
-### 2  Add Flink connectors (one time)
+* **PostgreSQL 15** — content dimension table (`content`)
+* **Kafka 7.5.3**    — raw (`engagements`) & processed (`processed_engagements`) event topics
+* **Flink 1.17.1**   — streaming job written in pure Flink SQL
+* **Docker Compose** — one‑liner spin‑up on any laptop
+
+---
+
+## 1  Architecture at a glance
+
+| Layer                           | Purpose                             | Image / Tag                   |
+| ------------------------------- | ----------------------------------- | ----------------------------- |
+| **Postgres**                    | Lookup metadata (content catalogue) | `postgres:15`                 |
+| **Kafka**                       | Source + sink event buses           | `confluentinc/cp‑kafka:7.5.3` |
+| **Flink**                       | Stateful streaming job              | `flink:1.17.1`                |
+| **(Optional) Redis / BigQuery** | Serve dashboards & heavy BI         | *add later*                   |
+
+---
+
+## 2  Where we are now  🚦
+
+| Milestone                              | Status                    | Notes                                                       |
+| -------------------------------------- | ------------------------- | ----------------------------------------------------------- |
+| Stack boots via `docker compose up -d` | ✅                         | Kafka, Flink, Postgres all healthy                          |
+| Postgres seeded (`Query.sql`)          | ✅                         | `content` rows loaded                                       |
+| Flink connectors jarred                | ✅                         | Added Kafka & JDBC drivers under `flink-jars/`              |
+| Flink tables created                   | ✅                         | `engagement_events`, `content_dim`, `processed_engagements` |
+| Main `INSERT` job submitted            | **🟡 Failed / Iterating** | Type‑casting edge‑case (UUID➞STRING) caused *FAILED* state  |
+| Extra sinks (Redis / BigQuery)         | ⏩                         | Out‑of‑scope for current sprint                             |
+
+> **Why we paused**: The team pivoted to recording a *self‑intro video* for the hiring process. Job debugging will resume after feedback on the current milestone.
+
+---
+
+## 3  Quick‑start (copy‑paste friendly)
+
+### 3.0  Prerequisites
+
+```bash
+# docker + compose
+brew install docker
+# local helpers
+pip install psycopg2‑binary kafka‑python
+```
+
+### 3.1  Clone & Launch
+
+```bash
+git clone <repo‑url>
+cd thmanyah‑task
+docker compose up -d    # ~30 sec
+```
+
+### 3.2  Add Flink connectors (one‑time)
+
 ```bash
 mkdir -p flink-jars
 # Kafka connector & client
@@ -38,64 +71,119 @@ wget -P flink-jars https://repo1.maven.org/maven2/org/apache/kafka/kafka-clients
 wget -P flink-jars https://repo1.maven.org/maven2/org/apache/flink/flink-connector-jdbc/3.1.2-1.17/flink-connector-jdbc-3.1.2-1.17.jar
 wget -P flink-jars https://jdbc.postgresql.org/download/postgresql-42.6.0.jar
 
-# Reload Flink so it picks up the jars
-docker compose down
-docker compose up -d
+docker compose down && docker compose up -d   # reload JARs
 ```
 
-### 3  Seed the database
+### 3.3  Seed Postgres
+
 ```bash
-docker exec -it thmanyah-task-postgres-1   psql -U thmanyah -d thmanyah_db -f /Query.sql
+# loads both `content` and an initial slice of `engagement_events`
+docker exec -it thmanyah-task-postgres-1 psql -U thmanyah -d thmanyah_db -f /Query.sql
 ```
 
-### 4  Create Flink tables + start the job
-```bash
-* the query on the folder Flink-sql.sql
+### 3.4  Create Flink objects & start job
 
+```bash
+# open Flink SQL CLI
 docker compose exec flink-jobmanager ./bin/sql-client.sh
--- execute each statement separately:
 
--- 1️⃣ Kafka source
-CREATE TABLE engagement_events ( ... ) WITH (...);     
+-- 1️⃣ Kafka source\CREATE TABLE engagement_events (
+  id BIGINT,
+  content_id STRING,
+  user_id STRING,
+  event_type STRING,
+  event_ts TIMESTAMP_LTZ(3),
+  duration_ms INT,
+  device STRING,
+  raw_payload MAP<STRING,STRING>,
+  WATERMARK FOR event_ts AS event_ts - INTERVAL '5' SECOND
+) WITH (
+  'connector'='kafka',
+  'topic'='engagements',
+  'properties.bootstrap.servers'='kafka:9092',
+  'scan.startup.mode'='earliest-offset',
+  'format'='json'
+);
 
--- 2️⃣ JDBC lookup (content)
-CREATE TABLE content ( ... ) WITH (...);
+-- 2️⃣ JDBC lookup view (content)
+CREATE TABLE content_dim (
+  id STRING,
+  slug STRING,
+  title STRING,
+  content_type STRING,
+  length_seconds INT,
+  publish_ts TIMESTAMP(3)
+) WITH (
+  'connector'='jdbc',
+  'url'='jdbc:postgresql://postgres:5432/thmanyah_db',
+  'table-name'='content',
+  'username'='thmanyah',
+  'password'='thmanyah123',
+  'driver'='org.postgresql.Driver'
+);
 
--- 3️⃣ Upsert sink
-CREATE TABLE processed_engagements ( ... ) WITH (...);
+-- 3️⃣ Upsert sink for metrics
+CREATE TABLE processed_engagements (
+  content_id STRING,
+  user_id STRING,
+  event_type STRING,
+  engagement_seconds DOUBLE,
+  engagement_pct DOUBLE,
+  PRIMARY KEY (content_id, user_id, event_ts) NOT ENFORCED
+) WITH (
+  'connector'='kafka',
+  'topic'='processed_engagements',
+  'properties.bootstrap.servers'='kafka:9092',
+  'format'='json'
+);
 
--- 4️⃣ Start streaming
+-- 4️⃣ ETL query (streaming)
 INSERT INTO processed_engagements
-SELECT … LEFT JOIN content c ON e.content_id = c.id ;
+SELECT
+  e.content_id,
+  e.user_id,
+  e.event_type,
+  e.duration_ms / 1000.0                      AS engagement_seconds,
+  CASE
+    WHEN c.length_seconds > 0 THEN ROUND((e.duration_ms / 1000.0) / c.length_seconds * 100, 2)
+    ELSE NULL
+  END AS engagement_pct
+FROM engagement_events e
+LEFT JOIN content_dim FOR SYSTEM_TIME AS OF e.event_ts AS c
+ON e.content_id = c.id;
 ```
 
-> Successful submission prints a **Job ID** (green in Flink UI).
+`INSERT` success prints a Job ID—verify on `http://localhost:8081`.
 
-### 5  Send a test event
-```bash
-echo '{"id":1,"content_id":"11111111-1111-1111-1111-111111111111","user_id":"u-1","event_type":"play","event_ts":"2025-08-10T09:25:00Z","duration_ms":60000,"device":"ios","raw_payload":{}}' |   docker exec -i thmanyah-task-fixed-kafka-1   kafka-console-producer --bootstrap-server kafka:9092 --topic engagements
-```
+### 3.5  Emit / Verify a test event
 
-### 6  Verify pipeline output
-```bash
-docker exec -it thmanyah-task-fixed-kafka-1   kafka-console-consumer --bootstrap-server kafka:9092   --topic processed_engagements --from-beginning
-```
+Same as before (steps 5‑6 in the Arabic notes).
 
-Expected JSON (sample):
-```json
-{
-  "content_id": "1111...",
-  "user_id": "u-1",
-  "event_type": "play",
-  "engagement_seconds": 60.0,
-  "engagement_pct": 0.033
-}
-```
+---
 
-### Troubleshooting Quick‑Table
+## 4  Troubleshooting Cheatsheet
 
-| Symptom | Likely Cause | Fix |
-|---------|--------------|-----|
-| `relation "content" does not exist` | `init.sql` not executed | Run step 3 |
-| `LEADER_NOT_AVAILABLE` in consumer | Sink hasn’t received data yet | Send a test event (step 5) |
-| Job missing / failed in Flink UI | Needs tables + INSERT re‑run | Repeat step 4 |
+| ☠️ Error                                   | Root cause                                 | How to unblock                                                                    |
+| ------------------------------------------ | ------------------------------------------ | --------------------------------------------------------------------------------- |
+| `relation "content" does not exist`        | DB seed missed                             | Repeat *3.3*                                                                      |
+| `java.lang.ClassCastException UUID→String` | Flink JDBC converts UUID → STRING manually | Add a `.cast(BINARY(16))` or store IDs as VARCHAR in Postgres                     |
+| Job stuck in **FAILED** & UI empty         | Running in detached session                | `docker compose exec flink-jobmanager flink list -a` then `flink cancel <job-id>` |
+
+---
+
+## 5  Next steps (TODO)
+
+1. Fix UUID type‑mismatch & re‑submit job
+2. Add Redis sink for 5‑minute rolling top‑N view
+3. Wire BigQuery batch backfill path
+4. Set up CI pipeline to auto‑publish connector JARs
+
+---
+
+## 6  Contributing
+
+PRs & issues welcome — this is a hiring take‑home, not production code, so any feedback is gold!
+
+---
+
+© 2025 Thmanyah – Data Engineering Exercise
