@@ -14,9 +14,8 @@
 جميع الخدمات (Kafka + Zookeeper + Postgres + Flink) تُشغَّل في Docker Compose.
 
 ## مخطّط المكوّنات
-yaml
 
-
+```text
 ┌────────────┐      raw events       ┌───────────┐   enriched stream   ┌────────────────┐
 │  Producer  │  ───────────────────> │  Kafka     │ ──────────────────> │  Flink Job     │
 │  (Python)  │   topic: engagements  │  Broker    │  topic: processed_ │  (SQL pipeline)│
@@ -28,6 +27,7 @@ yaml
                                │  table:       │<───────────────────────┘
                                │   content     │
                                └───────────────┘
+
 
 
 تم تنفيذ المشروع بدءًا من إعداد PostgreSQL ومرورًا بـ Flink وPython ,Kafka حتى تم بناء الجدول النهائي عبر Flink SQL.
