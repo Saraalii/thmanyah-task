@@ -7,6 +7,18 @@
 لكني أواصل العمل على فهمها؛ لأن الهدف الأساسي من المشروع هو التعلم العميق، وليس فقط إنجاز المهمة.
 شرف المحاولة يكفي بالنسبه لي 💪.
 
+
+طيب خلوني ابدا بملخّص المشروع بالكامل
+الفكرة باختصار
+نُنشئ خطّ معالجة بيانات لحظي (Real-Time Pipeline) يلتقط أحداث تفاعل المستخدمين من Kafka، ويُثريها بمعلومات المحتوى من PostgreSQL عبر Flink SQL، ثم يحسب :
+
+الحقل	الوصف
+engagement_seconds	‎duration_ms / 1000‎ → عدد الثواني الفعليّة للتفاعل
+engagement_pct	‎engagement_seconds / length_seconds * 100‎ (بدقّة منزلتين)
+
+وتُكتب النتيجة في موضوع Kafka آخر اسمه processed_engagements.
+جميع الخدمات (Kafka + Zookeeper + Postgres + Flink) تُشغَّل في Docker Compose.
+
 ```
 Kafka → Flink SQL (joins + metrics) → Kafka
            ↑                       ↓
@@ -86,7 +98,21 @@ docker compose exec flink-jobmanager ./bin/sql-client.sh
 CREATE TABLE engagement_events (...);
 
 -- جدول PostgreSQL للأبعاد
-CREATE TABLE content_dim (...);
+CREATE TABLE content_dim (
+    id STRING,
+    slug STRING,
+    title STRING,
+    content_type STRING,
+    length_seconds INT,
+    publish_ts TIMESTAMP(3)
+) WITH (
+  'connector' = 'jdbc',
+  'url' = 'jdbc:postgresql://postgres:5432/thmanyah_db',
+  'table-name' = 'content',
+  'username' = 'thmanyah',
+  'password' = 'thmanyah123',
+  'driver' = 'org.postgresql.Driver'
+);
 
 -- جدول Kafka للإخراج التحليلي
 CREATE TABLE processed_engagements (...);
